@@ -1,0 +1,78 @@
+```{r , echo=TRUE}
+#Loading and preprocessing the data
+df<-read.csv("activity.csv")
+df2<-df
+
+#Looking at the data and their class
+names(df)
+str(df)
+
+#As “date” is presented as a ‘Factor’ variable, I first converted it to a variable of “Date” class
+df$date<-as.Date(df$date)
+
+#What is mean total number of steps taken per day?
+#We should first calculate the total number of steps on each day, so, I used a ‘tapply’ function
+TotalDailySteps<-with(df, tapply(steps, date, sum, na.rm=TRUE))
+
+# the histogram of total steps taken each day. 
+hist(TotalDailySteps, col = "blue")
+
+#the mean and median of total number of steps taken each day.
+meanStep<-round(mean(TotalDailySteps), 2)
+medianStep<-round(median(TotalDailySteps), 2)
+
+#What is the average daily activity pattern?
+intervalSteps<-with(df, tapply(steps, interval, mean, na.rm=TRUE))
+
+plot(intervalSteps,axes = F, type="l", col="blue", xlab="Time", ylab="Average Number of Steps", main="Average Daily Activity Pattern")
+axis(1,at=c(0, 36, 72, 108, 144, 180, 216, 252, 288), label = c("0:00", "3:00","6:00", "9:00", "12:00","15:00","18:00","21:00","24:00"))
+axis(2)
+
+#the interval with maximum average steps taken 
+intervalSteps[which.max(intervalSteps)]
+
+MaxStepID<-which.max(intervalSteps)
+Hour<-MaxStepID[[1]]%/%12
+IntervalMinuteEnd<-(MaxStepID[[1]]%/%12)*5
+IntervalMinuteStart<-IntervalMinuteEnd - 5
+maxStep<-intervalSteps[MaxStepID]
+
+#Imputing missing values
+NAcount<-sum(is.na(df$steps))
+NAcount
+
+#For imputing missing values, I use the very nice “MICE” package.
+library(mice)
+imputedValues<-mice(df2)
+
+#Now we have imputed values and can reconstruct the new database:
+imputedDF<-complete(imputedValues)
+imputedDF$date<-as.Date(imputedDF$date)
+
+#Calculating total daily steps
+TotalDailySteps_IDF<-with(imputedDF, tapply(steps, date, sum, na.rm=TRUE))
+
+#Making the histograms:
+hist(TotalDailySteps_IDF, col = "bisque")
+
+#Calculating the central values
+meanStep_IDF<-round(mean(TotalDailySteps_IDF), 2)
+medianStep_IDF<-round(median(TotalDailySteps_IDF), 2)
+
+#Calculating the resulted change in central values
+meanDiff<- meanStep - meanStep_IDF
+medianDiff<-medianStep - medianStep_IDF
+
+#Are there differences in activity patterns between weekdays and weekends?
+imputedDF$weekdays<-weekdays(imputedDF$date)
+imputedDF$dayType<-ifelse(imputedDF$weekdays%in%c("Saturday", "Sunday"), "Weekend", "Weekday")
+
+intervalDaySteps<-aggregate(steps~interval+dayType, data = imputedDF, mean)
+
+library(ggplot2)
+g1<-ggplot(intervalDaySteps, aes(interval, steps))
+g1 + geom_line() +
+  facet_grid(dayType ~ .) +
+  xlab("5-minute interval") + 
+  ylab("Number of steps")
+```
